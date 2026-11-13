@@ -1,0 +1,11 @@
+fuse-ppkg links ps5-dump-forge, which is GPL-3.0-or-later:
+
+  ps5-dump-forge — https://github.com/quer3q/ps5-dump-forge — GPL-3.0-or-later
+    crates/ps5-dump-forge-fpkg (FpkgSource, the .pkg reader and its Kraken layout decoder)
+    vendor/ps5upload-fpkg (format engine, AES-XTS, CNT, PFS; vendored there)
+
+This crate itself is MIT (see LICENSE). A binary built from it is a combined work with the
+GPL-3.0-or-later crates and must be distributed under the GPL-3.0-or-later.
+
+ps5upload is PhantomPtr's (https://github.com/phantomptr/ps5upload) and the vendored
+kraken/AMPR parts follow its notices; see the forge repository's THIRD-PARTY-NOTICES.md.
