@@ -28,8 +28,9 @@ the exercise — see **Limits** below before pointing it at your library.
 ## Usage
 
 ```
-fuse-ppkg mount GAME.pkg MOUNTPOINT [--passcode P] [--uid N] [--gid N]
-                                    [--cache-mb N] [--readahead-mb N] [--auto-unmount]
+fuse-ppkg mount GAME.pkg MOUNTPOINT [--passcode P] [--uid N] [--gid N] [--workers N]
+                                    [--cache-mb N] [--readahead-mb N] [--fetch-kb N]
+                                    [--max-read-kb N] [--auto-unmount]
 fuse-ppkg list GAME.pkg [--passcode P]
 fuse-ppkg unmount MOUNTPOINT
 ```
@@ -38,8 +39,11 @@ fuse-ppkg unmount MOUNTPOINT
 |---|---|---|
 | `--passcode` | debug default (`0000…`) | Passcode of a native (AES-XTS) image |
 | `--uid`, `--gid` | `0` | Owner shown for every entry |
-| `--cache-mb` | `32` | Decoded data kept in memory |
-| `--readahead-mb` | `4` | Read ahead on sequential access (`0` to disable) |
+| `--workers` | `4` | Decoding workers, one reader each; files are sharded over them |
+| `--cache-mb` | `256` | Decoded data kept in memory, split over the workers |
+| `--readahead-mb` | `32` | Read ahead on sequential access (`0` to disable) |
+| `--fetch-kb` | `256` | Bytes fetched per miss (one Kraken block) |
+| `--max-read-kb` | `1024` | Largest read the kernel may send |
 | `--auto-unmount` | off | Unmount when the process exits |
 
 `list` prints the package's tree without mounting it (same reader, no FUSE).
@@ -53,22 +57,34 @@ fuse-ppkg unmount MOUNTPOINT
   symlinks, no xattrs, no write path.
 - **Patch packages** (`.pkg` update with a `\x7FLIH` header) list only the files they carry whole;
   blocks of the base game are not served, so mount the base package for those.
-- One `Mutex` serializes reads: a multi-threaded FUSE client queues behind it.
-- The tree is walked once at mount time (476 ms for 40 000 entries here); very large titles cost
-  seconds and some hundreds of MB of index memory.
-- macOS needs macFUSE and Windows WinFsp; neither is wired here.
+- Only Linux: macOS (macFUSE) and Windows (WinFsp) are not wired.
+- Memory: `--cache-mb` is the whole budget, divided by `--workers`. Each worker also opens the
+  package and walks its tree once, so `--workers` costs mount time and index memory.
+- The tree is walked at mount time, once per worker (476 ms for 40 000 entries here); very large
+  titles cost seconds and some hundreds of MB of index memory.
 
 ## Performance (this machine, synthetic package)
 
+Measured on a 560 MB package (four 128 MB files), defaults, `dd ... iflag=direct`:
+
 | Workload | Result |
 |---|---|
-| Sequential read (`dd`, `O_DIRECT`) | 142 MB/s |
-| 4 KiB random read, 32 MB cache | p50 1.9 ms |
-| 4 KiB random read, cache ≥ file size | p50 0.13 ms |
-| Mount (index 40 208 entries) | 476 ms, 3.6 MiB RSS |
+| Sequential read, one stream | 175 MB/s (210 peak) |
+| Four concurrent streams | 385 MB/s aggregate (500 peak) |
+| 4 KiB random read | p50 0.18 ms |
+| 64 KiB reads over many small files | 0.14 ms |
+| Mount (index 40 208 entries) | 476 ms |
 
-Random reads are the weak spot: a 4 KiB read costs a whole 256 KiB block decode on a miss.
-Size `--cache-mb` to the files a game streams and the cost disappears.
+For comparison, the first synchronous version of this adapter did 91 MB/s sequential,
+2.2 ms per 4 KiB random read and 17 MB/s over four streams. What changed:
+
+- decoding moved to a worker thread, so FUSE callbacks serve cache hits and only wait for a
+  chunk that is already being fetched;
+- one reader and cache per worker, files sharded over them by path hash, so separate files
+  decode side by side;
+- read-ahead windows (32 MB) scheduled ahead of a sequential read, fetched as merged 8 MB
+  ranges so the decoder runs wide on every core;
+- chunks shared as `Arc<[u8]>`, so a request copies only its own bytes.
 
 ## Build and test
 

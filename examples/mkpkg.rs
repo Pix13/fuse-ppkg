@@ -1,4 +1,4 @@
-//! Build a debug FPKG to test the filesystem with: `mkpkg OUT.pkg [FILES] [BIG_BYTES]`
+//! Build a debug FPKG to test the filesystem with: `mkpkg OUT.pkg [FILES] [BIG_BYTES] [BIG_COUNT]`
 //!
 //! The tree is synthetic: `eboot.bin`, `sce_sys/param.json`, `FILES` small files under
 //! `data/dir###/`, an empty directory and one random `BIG_BYTES` file. Built through
@@ -21,6 +21,11 @@ fn main() {
         .unwrap_or_else(|| "8388608".into())
         .parse()
         .expect("big bytes");
+    let big_count: usize = args
+        .next()
+        .unwrap_or_else(|| "1".into())
+        .parse()
+        .expect("big count");
     let src = std::env::temp_dir().join(format!("fuse-ppkg-mkpkg-{}", std::process::id()));
     std::fs::create_dir_all(src.join("sce_sys")).unwrap();
     let mut rng = 0x1234_5678_9abc_def0u64;
@@ -46,7 +51,9 @@ fn main() {
         std::fs::write(&p, bytes(2_000 + (i * 977) % 40_000)).unwrap();
     }
     std::fs::create_dir_all(src.join("data/empty")).unwrap();
-    std::fs::write(src.join("data/big.bin"), bytes(big)).unwrap();
+    for i in 0..big_count {
+        std::fs::write(src.join(format!("data/big{i}.bin")), bytes(big)).unwrap();
+    }
     let outdir = out.parent().expect("out path has a parent");
     let mut r = BuildRequest::production(&src, outdir);
     r.time = Some((1_700_000_000, 0));

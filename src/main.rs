@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! fuse-ppkg mount GAME.pkg /mnt/game [--passcode P] [--uid N] [--gid N]
-//!                                 [--cache-mb N] [--readahead-mb N] [--auto-unmount]
+//!                                 [--cache-mb N] [--readahead-mb N] [--fetch-kb N] [--max-read-kb N] [--workers N] [--auto-unmount]
 //! fuse-ppkg list  GAME.pkg [--passcode P]
 //! fuse-ppkg unmount /mnt/game
 //! ```
@@ -36,6 +36,9 @@ struct Args {
     gid: u32,
     cache_mb: usize,
     readahead_mb: usize,
+    fetch_kb: usize,
+    max_read_kb: usize,
+    workers: usize,
     auto_unmount: bool,
 }
 
@@ -46,8 +49,11 @@ fn parse_args() -> Args {
         passcode: None,
         uid: 0,
         gid: 0,
-        cache_mb: 32,
-        readahead_mb: 4,
+        cache_mb: 256,
+        readahead_mb: 32,
+        fetch_kb: 256,
+        max_read_kb: 1024,
+        workers: 4,
         auto_unmount: false,
     };
     let mut it = std::env::args().skip(1);
@@ -101,6 +107,8 @@ fn options(a: &Args) -> Options {
         gid: a.gid,
         cache_bytes: a.cache_mb << 20,
         readahead_bytes: a.readahead_mb << 20,
+        fetch_bytes: ((a.fetch_kb.max(4)) << 10) as u64,
+        workers: a.workers,
     }
 }
 
@@ -140,6 +148,12 @@ fn mount(a: &Args) {
         .unwrap_or("fpkg")
         .replace(',', "_");
     opts.push(MountOption::FSName(format!("fuse-ppkg:{name}")));
+    if a.max_read_kb > 0 {
+        opts.push(MountOption::CUSTOM(format!(
+            "max_read={}",
+            a.max_read_kb << 10
+        )));
+    }
     if a.auto_unmount {
         opts.push(MountOption::AutoUnmount);
     }

@@ -55,8 +55,32 @@ en RO sur `/app0/kraken` et sert les gros fichiers via un index AMPR que seul am
 comprend. ShadowMountPlus monte les images (`.ffpkg`, `.exfat`, `.ffpfs`, `.ffpfsc`) sur la
 console, pas les `.pkg`. Un FUSE côté PC est donc un complément, pas un doublon.
 
+## Optimisation (après la première version synchrone)
+
+Première version : un seul lecteur, cache LRU, readahead synchrone. Mesures : 91 Mo/s en
+séquentiel, 2,2 ms par lecture 4 Kio aléatoire, 17 Mo/s agrégés sur 4 flux concurrents. Le
+point dur n'était pas le décodage mais la sérialisation : chaque lecture bloquait le fil FUSE
+unique (fuser) sur un décodage, et un seul cache servait tous les fichiers.
+
+Version retenue :
+
+- décodage dans des fils ouvriers, les rappels FUSE ne font que copier depuis un cache et
+  n'attendent qu'un bloc déjà en cours de lecture ;
+- un lecteur et un cache par ouvrier, fichiers répartis par hachage du chemin : les fichiers
+  distincts décodent en parallèle, chaque ouvrier garde son propre fenêtrage ;
+- fenêtre de readahead (32 Mio) planifiée avant la lecture séquentielle, et lectures fusionnées
+  jusqu'à 8 Mio pour décoder large sur tous les cœurs ;
+- blocs partagés en `Arc<[u8]>`, une requête ne copie que ses propres octets ;
+- `max_read=1 Mio` pour que le noyau demande gros.
+
+Résultat sur 4 flux concurrents : 385 Mo/s agrégés (500 en pointe), 175 Mo/s en séquentiel
+simple, p50 0,18 ms en 4 Kio aléatoire, soit ~20× le débit concurrent et ~12× la latence de la
+première version. Le coût est la mémoire (`--cache-mb`, 256 Mio par défaut, répartie) et le
+temps de montage (un parcours d'arbre par ouvrier).
+
 ## Mise en œuvre ici
 
-`src/lib.rs` (index chemin → inode, cache de blocs avec LRU, readahead séquentiel), `src/main.rs`
-(mount/list/unmount), `examples/mkpkg` (paquet de test), `scripts/smoke.sh` (montage + `diff -r`
-contre l'extraction CLI). Le FS est monté en `ro`, `NoAtime`, `NoExec`, `NoSuid`.
+`src/lib.rs` (index chemin → inode, caches LRU par ouvrier, fenêtres de readahead, fusion des
+lectures), `src/main.rs` (mount/list/unmount), `examples/mkpkg` (paquet de test),
+`scripts/smoke.sh` (montage, `diff -r` et hachage concurrent contre l'extraction CLI). Le FS est
+monté en `ro`, `NoAtime`, `NoExec`, `NoSuid`, `max_read=1 Mio`.
