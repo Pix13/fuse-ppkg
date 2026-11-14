@@ -17,13 +17,37 @@ $ fuse-ppkg unmount /mnt/ps5
 
 ## Status
 
-Prototype, read-only, Linux. It works on packages this reader supports, which is the point of
-the exercise — see **Limits** below before pointing it at your library.
+Prototype, read-only, Linux, tagged `v0.1`. It works on packages this reader supports — see
+**Limits** below before pointing it at your library.
 
 ## Requirements
 
-- Linux with `/dev/fuse` and `fusermount3` (or `fusermount`); unprivileged mounts are fine.
+- Linux with `/dev/fuse` and `fusermount3` (or `fusermount`) — install the `fuse3` package of
+  your distribution; unprivileged mounts are fine.
 - Rust 1.85+ to build.
+
+## Prebuilt binary
+
+The [v0.1 release](https://github.com/Pix13/fuse-ppkg/releases/tag/v0.1) carries
+`fuse-ppkg-x86_64-linux-musl`, a stripped static-pie x86-64 build: it depends on no libc, so
+the distribution and its glibc version do not matter. The `fuse3` package is still needed at
+run time (the mount helper), and the kernel's `fuse` module with `/dev/fuse`.
+
+```console
+$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.1/fuse-ppkg-x86_64-linux-musl
+$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.1/fuse-ppkg-x86_64-linux-musl.sha256
+$ sha256sum -c fuse-ppkg-x86_64-linux-musl.sha256
+$ install -m 0755 fuse-ppkg-x86_64-linux-musl ~/.local/bin/fuse-ppkg
+```
+
+Mounting a real package with this binary was tested on Debian 12, Ubuntu 24.04, Fedora 41,
+Alpine 3.20 and Alpine 3.21 (each with `fuse3` installed) and every distribution returned the
+same SHA-256 for the same file. Build or refresh it with:
+
+```console
+$ rustup target add x86_64-unknown-linux-musl
+$ cargo build --release --target x86_64-unknown-linux-musl
+```
 
 ## Usage
 
