@@ -22,8 +22,21 @@ Prototype, read-only, Linux, tagged `v0.1`. It works on packages this reader sup
 
 ## Requirements
 
-- Linux with `/dev/fuse` and `fusermount3` (or `fusermount`) — install the `fuse3` package of
-  your distribution; unprivileged mounts are fine.
+- Linux with `/dev/fuse` and `fusermount3` (or `fusermount`); unprivileged mounts are fine.
+- The mount helper comes from the `fuse3` package of your distribution:
+
+  | Distribution | Install |
+  |---|---|
+  | CachyOS, Arch | `sudo pacman -S --needed fuse3` |
+  | Bazzite | shipped in the image — nothing to install |
+  | Fedora Atomic (other images) | `rpm-ostree install fuse3` then reboot |
+  | Fedora | `sudo dnf install fuse3` |
+  | Debian, Ubuntu | `sudo apt install fuse3` |
+  | Alpine | `sudo apk add fuse3` |
+  | openSUSE | `sudo zypper install fuse3` |
+
+  On other atomic images, check first (`rpm -q fuse3`): nothing to layer when it is already
+  there. Layering survives image upgrades.
 - Rust 1.85+ to build.
 
 ## Prebuilt binary
@@ -40,9 +53,9 @@ $ sha256sum -c fuse-ppkg-x86_64-linux-musl.sha256
 $ install -m 0755 fuse-ppkg-x86_64-linux-musl ~/.local/bin/fuse-ppkg
 ```
 
-Mounting a real package with this binary was tested on Debian 12, Ubuntu 24.04, Fedora 41,
-Alpine 3.20 and Alpine 3.21 (each with `fuse3` installed) and every distribution returned the
-same SHA-256 for the same file. Build or refresh it with:
+Mounting a real package with this binary was tested on Debian 12, Ubuntu 24.04, CachyOS (after
+`pacman -S fuse3`), Bazzite (out of the box), Fedora 41, Alpine 3.20 and Alpine 3.21; every
+distribution returned the same SHA-256 for the same file. Build or refresh it with:
 
 ```console
 $ rustup target add x86_64-unknown-linux-musl
