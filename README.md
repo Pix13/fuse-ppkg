@@ -86,6 +86,33 @@ For comparison, the first synchronous version of this adapter did 91 MB/s sequen
   ranges so the decoder runs wide on every core;
 - chunks shared as `Arc<[u8]>`, so a request copies only its own bytes.
 
+### On a real title (Astro Bot, 37.4 GB package)
+
+The package holds 166 719 files (159.8 GB of logical content) and is Kraken-compressed
+throughout, so it decodes slower than the synthetic one.
+
+```console
+$ fuse-ppkg mount EP9000-PPSA21567_00-….pkg /mnt/astro \
+    --cache-mb 1024 --readahead-mb 64 --workers 4
+fuse-ppkg: indexed 168865 entries in 2.7s
+```
+
+| Workload | Result |
+|---|---|
+| First pass, 583 MB video file | 50 MB/s |
+| Second pass, same file | 92 MB/s |
+| 4 KiB random read | p50 2.6 ms |
+| Mount | 2.7 s, 361 MB RSS before the cache fills |
+
+- `--cache-mb 1024` and `--readahead-mb 64` suit its large media files; `--workers 8` helps
+  when several files play at once and the machine has the RAM.
+- `--fetch-kb` makes no visible difference on a single large file here (256 to 4096 measured
+  within noise); keep the 256 default for random access.
+- Bytes match the package exactly: SHA3-256 of `eboot.bin` (259 MB) and `sce_sys/param.json`
+  read through the mount equals the reader's own read.
+- Start it detached, or pass `--auto-unmount`: killed with its shell, a foreground mount is
+  left as "Transport endpoint is not connected".
+
 ## Build and test
 
 ```console

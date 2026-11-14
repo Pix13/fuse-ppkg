@@ -84,3 +84,17 @@ temps de montage (un parcours d'arbre par ouvrier).
 lectures), `src/main.rs` (mount/list/unmount), `examples/mkpkg` (paquet de test),
 `scripts/smoke.sh` (montage, `diff -r` et hachage concurrent contre l'extraction CLI). Le FS est
 monté en `ro`, `NoAtime`, `NoExec`, `NoSuid`, `max_read=1 Mio`.
+
+## Essai sur un vrai titre (Astro Bot)
+
+Paquet de base de 37,4 Go, 166 719 fichiers, 159,8 Go de contenu logique, entièrement
+compressé Kraken : 2,7 s d'indexation, 361 Mio de RSS avant remplissage du cache.
+
+Réglages retenus pour ce titre : `--cache-mb 1024 --readahead-mb 64 --workers 4` (8 ouvriers
+si assez de RAM et plusieurs fichiers lus en parallèle), `--fetch-kb` laissé à 256. Mesures :
+50 Mo/s au premier passage sur une vidéo de 583 Mo, 92 Mo/s au second, p50 2,6 ms en 4 Kio
+aléatoire. Les empreintes SHA3 de `eboot.bin` (259 Mo) et `sce_sys/param.json` lus par le
+montage sont identiques à celles du lecteur direct.
+
+Un montage lancé au premier plan et tué avec son shell reste en « Transport endpoint is not
+connected » : lancer détaché ou avec `--auto-unmount`.
