@@ -18,8 +18,8 @@ $ fuse-ppkg unmount /mnt/ps5
 
 ## Status
 
-Prototype, read-only, Linux, tagged `v0.1`. It works on packages this reader supports — see
-**Limits** below before pointing it at your library.
+Prototype, read-only, Linux, tagged `v0.2`. It works on the sources these readers support —
+see **Limits** below before pointing it at your library.
 
 ## Requirements
 
