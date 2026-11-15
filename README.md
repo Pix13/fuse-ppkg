@@ -1,8 +1,9 @@
 # fuse-ppkg
 
-Mount a PS5 debug FPKG (`.pkg`) as a read-only directory. Nothing is unpacked: file bytes are
-read at their offsets in the `.pkg` and Kraken blocks are decoded only where a read touches
-them, through [ps5-dump-forge](https://github.com/quer3q/ps5-dump-forge)'s `FpkgSource`.
+Mount a PS5 game source — debug FPKG (`.pkg`), `.ffpkg` (UFS2), `.exfat`, `.ffpfs` (PFS),
+`.ffpfsc` (compressed PFS) or a game folder — as a read-only directory. Nothing is unpacked:
+file bytes are read at their offsets in the image and only the blocks a read touches are
+decoded, through [ps5-dump-forge](https://github.com/quer3q/ps5-dump-forge)'s readers.
 
 ```console
 $ fuse-ppkg mount PPSA01234.pkg /mnt/ps5
@@ -65,7 +66,8 @@ $ cargo build --release --target x86_64-unknown-linux-musl
 ## Usage
 
 ```
-fuse-ppkg mount GAME.pkg MOUNTPOINT [--passcode P] [--uid N] [--gid N] [--workers N]
+fuse-ppkg mount SOURCE MOUNTPOINT [--format auto|pkg|ffpkg|exfat|ffpfs|ffpfsc|folder]
+                                    [--passcode P] [--uid N] [--gid N] [--workers N]
                                     [--cache-mb N] [--readahead-mb N] [--fetch-kb N]
                                     [--max-read-kb N] [--auto-unmount]
 fuse-ppkg list GAME.pkg [--passcode P]
@@ -81,14 +83,18 @@ fuse-ppkg unmount MOUNTPOINT
 | `--readahead-mb` | `32` | Read ahead on sequential access (`0` to disable) |
 | `--fetch-kb` | `256` | Bytes fetched per miss (one Kraken block) |
 | `--max-read-kb` | `1024` | Largest read the kernel may send |
+| `--format` | `auto` | Source format; `auto` reads the extension, else the first reader that opens it |
 | `--auto-unmount` | off | Unmount when the process exits |
 
 `list` prints the package's tree without mounting it (same reader, no FUSE).
 
 ## Limits
 
-- **Debug FPKG only.** Retail packages are refused by the reader (their header is signed); a
-  debug package built with a non-default passcode needs `--passcode`.
+- **Supported sources**: `.pkg` (debug FPKG only — retail packages are refused by the reader,
+  a debug one built with a non-default passcode needs `--passcode`), `.ffpkg`, `.exfat`,
+  `.ffpfs` (unencrypted), `.ffpfsc` and folders.
+- `.ffpfsc` decompresses zlib per 64 KiB block, so random reads cost more than on a plain
+  image; give it a larger `--cache-mb` and expect lower throughput.
 - **Read-only.** The format lists regular files and directories only, with no mode, owner or
   timestamp: modes are synthesized (`0555`/`0444`) and the package's mtime is used. There are no
   symlinks, no xattrs, no write path.

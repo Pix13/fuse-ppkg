@@ -188,11 +188,12 @@ dependencies = [
 
 [[package]]
 name = "fuse-ppkg"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "fuser",
  "libc",
  "ps5-dump-forge-fpkg",
+ "ps5-dump-forge-pfs",
  "ps5upload-fpkg",
 ]
 
@@ -379,6 +380,24 @@ name = "ps5-dump-forge-fpkg"
 version = "0.5.5"
 source = "git+https://github.com/quer3q/ps5-dump-forge?rev=8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd#8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd"
 dependencies = [
+ "ps5upload-fpkg",
+]
+
+[[package]]
+name = "ps5-dump-forge-patch"
+version = "0.5.5"
+source = "git+https://github.com/quer3q/ps5-dump-forge?rev=8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd#8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd"
+dependencies = [
+ "crc32fast",
+]
+
+[[package]]
+name = "ps5-dump-forge-pfs"
+version = "0.5.5"
+source = "git+https://github.com/quer3q/ps5-dump-forge?rev=8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd#8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd"
+dependencies = [
+ "flate2",
+ "ps5-dump-forge-patch",
  "ps5upload-fpkg",
 ]
 

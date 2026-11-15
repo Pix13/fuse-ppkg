@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! fuse-ppkg mount GAME.pkg /mnt/game [--passcode P] [--uid N] [--gid N]
-//!                                 [--cache-mb N] [--readahead-mb N] [--fetch-kb N] [--max-read-kb N] [--workers N] [--auto-unmount]
+//!                                 [--cache-mb N] [--readahead-mb N] [--fetch-kb N] [--max-read-kb N] [--workers N] [--format auto|pkg|ffpkg|exfat|ffpfs|ffpfsc|folder] [--auto-unmount]
 //! fuse-ppkg list  GAME.pkg [--passcode P]
 //! fuse-ppkg unmount /mnt/game
 //! ```
@@ -39,6 +39,7 @@ struct Args {
     fetch_kb: usize,
     max_read_kb: usize,
     workers: usize,
+    format: fuse_ppkg::Format,
     auto_unmount: bool,
 }
 
@@ -54,6 +55,7 @@ fn parse_args() -> Args {
         fetch_kb: 256,
         max_read_kb: 1024,
         workers: 4,
+        format: fuse_ppkg::Format::Auto,
         auto_unmount: false,
     };
     let mut it = std::env::args().skip(1);
@@ -109,6 +111,7 @@ fn options(a: &Args) -> Options {
         readahead_bytes: a.readahead_mb << 20,
         fetch_bytes: ((a.fetch_kb.max(4)) << 10) as u64,
         workers: a.workers,
+        format: a.format,
     }
 }
 

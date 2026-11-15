@@ -98,3 +98,12 @@ montage sont identiques à celles du lecteur direct.
 
 Un montage lancé au premier plan et tué avec son shell reste en « Transport endpoint is not
 connected » : lancer détaché ou avec `--auto-unmount`.
+
+## Formats voisins
+
+Le dépôt sait aussi lire les images `.ffpkg` (UFS2), `.exfat`, `.ffpfs` et les conteneurs
+`.ffpfsc`, ainsi que les dossiers et les archives. Tous les lecteurs d'images exposent la même
+interface `SourceTree` que `FpkgSource` : l'adaptateur FUSE les sert sans changement, seul le
+lecteur diffère. `--format` force un format ; sans lui, l'extension décide, sinon le premier
+lecteur qui ouvre le fichier. Les quatre formats ont été montés et comparés à l'extraction du
+paquet : identiques. `.ffpfsc` décompresse du zlib par bloc et demande un cache plus grand.

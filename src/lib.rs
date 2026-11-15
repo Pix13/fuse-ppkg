@@ -24,7 +24,10 @@ use fuser::{
     Request,
 };
 use ps5_dump_forge_fpkg::FpkgSource;
-use ps5upload_fpkg::source::SourceTree;
+use ps5_dump_forge_pfs::{PfsSource, open_ffpfsc};
+use ps5upload_fpkg::exfat::ExFatSource;
+use ps5upload_fpkg::source::{FolderSource, SourceTree};
+use ps5upload_fpkg::ufs2_source::Ufs2Source;
 
 const TTL: Duration = Duration::from_secs(60);
 const ROOT: u64 = 1;
@@ -43,6 +46,47 @@ pub struct Options {
     pub fetch_bytes: u64,
     /// Decoding workers, each with its own reader (`--workers`).
     pub workers: usize,
+    /// The package format (`--format`), `Auto` to detect it.
+    pub format: Format,
+}
+
+/// What the source file is. Every format lists the same way (`SourceTree`); only the reader
+/// differs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    Auto,
+    Pkg,
+    Ffpkg,
+    Exfat,
+    Ffpfps,
+    Ffpfsc,
+    Folder,
+}
+
+impl Format {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "auto" => Some(Self::Auto),
+            "pkg" => Some(Self::Pkg),
+            "ffpkg" => Some(Self::Ffpkg),
+            "exfat" => Some(Self::Exfat),
+            "ffpfs" => Some(Self::Ffpfps),
+            "ffpfsc" => Some(Self::Ffpfsc),
+            "folder" => Some(Self::Folder),
+            _ => None,
+        }
+    }
+
+    fn of(name: &std::ffi::OsStr) -> Option<Self> {
+        match name.to_str()?.to_ascii_lowercase().as_str() {
+            "pkg" => Some(Self::Pkg),
+            "ffpkg" => Some(Self::Ffpkg),
+            "exfat" => Some(Self::Exfat),
+            "ffpfs" => Some(Self::Ffpfps),
+            "ffpfsc" => Some(Self::Ffpfsc),
+            _ => None,
+        }
+    }
 }
 
 impl Default for Options {
@@ -55,6 +99,7 @@ impl Default for Options {
             readahead_bytes: 8 << 20,
             fetch_bytes: 256 << 10,
             workers: 4,
+            format: Format::Auto,
         }
     }
 }
@@ -278,7 +323,7 @@ const MERGE: usize = 8 << 20;
 
 /// Fetch chunks from `src` until the cache is stopped. Consecutive read-ahead chunks of one
 /// file are fetched as one range, so a streaming file decodes wide and fast.
-fn worker(mut src: FpkgSource, cache: Arc<Cache>) {
+fn worker(mut src: Box<dyn SourceTree>, cache: Arc<Cache>) {
     while let Some(((path, at), len)) = cache.next() {
         let mut batch = vec![(at, len)];
         let mut total = len;
@@ -329,6 +374,54 @@ impl Engine {
     }
 }
 
+/// Open `path` as `format`. The package formats all speak the same tree interface; only the
+/// reader differs. `.pkg` is refused for retail packages by its reader.
+fn open_source(
+    path: &Path,
+    format: Format,
+    passcode: Option<&str>,
+) -> Result<Box<dyn SourceTree>, String> {
+    let label = path.display().to_string();
+    let plain = |e: ps5upload_fpkg::Error| format!("{label}: {e}");
+    let file = || std::fs::File::open(path).map_err(|e| format!("{label}: {e}"));
+    Ok(match format {
+        Format::Pkg => Box::new(FpkgSource::open(path, passcode).map_err(plain)?),
+        Format::Ffpfsc => {
+            let (tree, _) = open_ffpfsc(Box::new(file()?), &label).map_err(plain)?;
+            tree
+        }
+        Format::Ffpfps => {
+            Box::new(PfsSource::from_reader(Box::new(file()?), label.clone()).map_err(plain)?)
+        }
+        Format::Ffpkg => Box::new(Ufs2Source::open(path).map_err(plain)?),
+        Format::Exfat => Box::new(ExFatSource::open(path).map_err(plain)?),
+        Format::Folder => Box::new(FolderSource::open(path).map_err(plain)?),
+        Format::Auto => return Err(format!("{label}: no format given")),
+    })
+}
+
+/// The format of `path`: its extension when it names one, else the first reader that opens it.
+fn detect(path: &Path) -> Result<Format, String> {
+    if path.is_dir() {
+        return Ok(Format::Folder);
+    }
+    if let Some(f) = path.extension().and_then(Format::of) {
+        return Ok(f);
+    }
+    for format in [
+        Format::Pkg,
+        Format::Ffpfsc,
+        Format::Ffpfps,
+        Format::Ffpkg,
+        Format::Exfat,
+    ] {
+        if open_source(path, format, None).is_ok() {
+            return Ok(format);
+        }
+    }
+    Err("no known package format".to_string())
+}
+
 pub struct State {
     nodes: HashMap<u64, Node>,
     children: HashMap<u64, Vec<u64>>,
@@ -348,7 +441,11 @@ impl State {
     /// Open `pkg` and index its whole tree. The package is refused as `FpkgSource::open` says
     /// (not a PS5 package, retail, wrong passcode, unsupported codec, corrupt).
     pub fn new(pkg: &Path, opts: Options) -> Result<Self, String> {
-        let src = FpkgSource::open(pkg, opts.passcode.as_deref()).map_err(|e| e.to_string())?;
+        let format = match opts.format {
+            Format::Auto => detect(pkg)?,
+            format => format,
+        };
+        let src = open_source(pkg, format, opts.passcode.as_deref())?;
         let mtime = std::fs::metadata(pkg)
             .and_then(|m| m.modified())
             .unwrap_or(SystemTime::UNIX_EPOCH);
@@ -413,10 +510,10 @@ impl State {
             s.engine.workers.push(thread::spawn(move || {
                 let opened = match src {
                     Some(src) => src,
-                    None => match FpkgSource::open(&path, passcode.as_deref()) {
+                    None => match open_source(&path, format, passcode.as_deref()) {
                         Ok(src) => src,
                         Err(e) => {
-                            cache.die(format!("{}: {e}", path.display()));
+                            cache.die(e);
                             return;
                         }
                     },

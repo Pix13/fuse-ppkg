@@ -1,9 +1,9 @@
 [package]
 name = "fuse-ppkg"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
-description = "Mount a PS5 debug FPKG (.pkg) as a read-only FUSE filesystem"
+description = "Mount a PS5 game image (.pkg, .ffpkg, .exfat, .ffpfs, .ffpfsc) as a read-only FUSE filesystem"
 license = "MIT"
 repository = "https://github.com/Pix13/fuse-ppkg"
 
@@ -12,6 +12,7 @@ fuser = { version = "0.15", default-features = false }
 libc = "0.2"
 ps5-dump-forge-fpkg = { git = "https://github.com/quer3q/ps5-dump-forge", rev = "8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd" }
 ps5upload-fpkg = { git = "https://github.com/quer3q/ps5-dump-forge", rev = "8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd" }
+ps5-dump-forge-pfs = { git = "https://github.com/quer3q/ps5-dump-forge", rev = "8a3c7d3e4bfeac3b4ddf8e9ff020e819ae8ff1cd" }
 
 
 [profile.release]
