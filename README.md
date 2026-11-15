@@ -42,14 +42,14 @@ Prototype, read-only, Linux, tagged `v0.1`. It works on packages this reader sup
 
 ## Prebuilt binary
 
-The [v0.1 release](https://github.com/Pix13/fuse-ppkg/releases/tag/v0.1) carries
+The [v0.1 release](https://github.com/Pix13/fuse-ppkg/releases/tag/v0.2) carries
 `fuse-ppkg-x86_64-linux-musl`, a stripped static-pie x86-64 build: it depends on no libc, so
 the distribution and its glibc version do not matter. The `fuse3` package is still needed at
 run time (the mount helper), and the kernel's `fuse` module with `/dev/fuse`.
 
 ```console
-$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.1/fuse-ppkg-x86_64-linux-musl
-$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.1/fuse-ppkg-x86_64-linux-musl.sha256
+$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.2/fuse-ppkg-x86_64-linux-musl
+$ curl -LO https://github.com/Pix13/fuse-ppkg/releases/download/v0.2/fuse-ppkg-x86_64-linux-musl.sha256
 $ sha256sum -c fuse-ppkg-x86_64-linux-musl.sha256
 $ install -m 0755 fuse-ppkg-x86_64-linux-musl ~/.local/bin/fuse-ppkg
 ```
